@@ -1,0 +1,223 @@
+# =============================
+# Character + Memory Prototype
+# =============================
+
+import time
+from typing import Dict, List
+
+# =============================
+# CONFIG
+# =============================
+
+LLM_API_KEY = "KEY HERE PSQ"   # <---- PLACE KEY HERE
+EMBEDDING_API_KEY = "KEY HERE PSQ"  # <---- PLACE KEY HERE
+
+# =============================
+# CHARACTER STORAGE
+# =============================
+
+CHARACTERS: Dict[str, dict] = {}
+MEMORY: Dict[str, List[dict]] = {}   # per character conversational memory
+
+# =============================
+# CREATE CHARACTER
+# =============================
+
+def create_character(data):
+    """
+    Expected input:
+    {
+      "name": str,
+      "gender": str,
+      "intro": str,
+      "start": str,
+      "traits": {... 0-10 ...},
+      "background": str,
+      "speech_style": {...}
+    }
+    """
+    
+    CHARACTERS[data["name"]] = {
+        "identity": {
+            "name": data["name"],
+            "gender": data.get("gender", "Unknown"),
+            "intro": data.get("intro", ""),
+            "start": data.get("start", "")
+        },
+
+        "traits": normalize_traits(data["traits"]),
+        
+        "background": {
+            "raw": data["background"],
+            "summary": summarize_background(data["background"])
+        },
+        
+        "speech_style": data["speech_style"]
+    }
+
+    MEMORY[data["name"]] = []  # init memory store
+
+    print(f"Character '{data['name']}' created!")
+
+
+# =============================
+# NORMALIZE TRAITS 0–10 -> 0–1
+# =============================
+
+def normalize_traits(traits):
+    normalized = {}
+    for key, value in traits.items():
+        normalized[key] = round(value / 10, 2)
+    return normalized
+
+
+# =============================
+# BACKGROUND SUMMARY
+# Replace with real LLM later
+# =============================
+
+def summarize_background(text):
+    # Simple truncation summary for prototype
+    if len(text) > 400:
+        return text[:400] + "..."
+    return text
+
+
+# =============================
+# MEMORY SYSTEM
+# =============================
+
+def store_memory(character, user_text, response):
+    MEMORY[character].append({
+        "timestamp": time.time(),
+        "user": user_text,
+        "response": response
+    })
+
+
+def recall_relevant_memory(character, user_input):
+    """
+    SUPER SIMPLE MEMORY:
+    Returns last 3 memories.
+    """
+    return MEMORY[character][-3:]
+
+
+# =============================
+# BUILD PERSONA PROMPT
+# =============================
+
+def build_prompt(character_name, user_input):
+    char = CHARACTERS[character_name]
+
+    identity = char["identity"]
+    traits = char["traits"]
+    background_summary = char["background"]["summary"]
+    speech = char["speech_style"]
+
+    recent_memories = recall_relevant_memory(character_name, user_input)
+
+    memory_text = ""
+    for m in recent_memories:
+        memory_text += f"User: {m['user']}\nCharacter: {m['response']}\n\n"
+
+    prompt = f"""
+You are {identity['name']} ({identity['gender']}).
+Intro: {identity['intro']}
+
+PERSONALITY TRAITS (0–1 normalized):
+Warmth: {traits.get("warmth")}
+Energy: {traits.get("energy")}
+Formality: {traits.get("formality")}
+Empathy: {traits.get("empathy")}
+Humor: {traits.get("humor")}
+Courage: {traits.get("courage")}
+
+SPEECH STYLE:
+Vocabulary: {speech.get("vocab")}
+Sentence Length: {speech.get("length")}
+Emoji/Slang: {speech.get("slang")}
+Perspective: {speech.get("perspective")}
+
+BACKGROUND SUMMARY:
+{background_summary}
+
+RECENT MEMORY WITH USER:
+{memory_text}
+
+Stay completely in character.
+Avoid disallowed content.
+Respond emotionally consistent with traits.
+
+User says: {user_input}
+Character replies:
+"""
+    return prompt
+
+
+# =============================
+# FAKE LLM CALL
+# =============================
+
+def call_llm(prompt):
+    # ---- REAL IMPLEMENTATION WILL:
+    # send prompt to Mistral / Qwen
+    # using key: "KEY HERE PSQ"
+    
+    print("Calling LLM with KEY HERE PSQ ...")  # <-- label
+    return "This is where the model response would go."
+
+
+# =============================
+# CHAT FUNCTION
+# =============================
+
+def chat(character_name, user_input):
+    prompt = build_prompt(character_name, user_input)
+    response = call_llm(prompt)
+
+    store_memory(character_name, user_input, response)
+
+    return response
+
+
+# =============================
+# =============================
+# EXAMPLE USAGE
+# =============================
+# =============================
+
+create_character({
+    "name": "Lyra",
+    "gender": "Female",
+    "intro": "A thoughtful detective who notices everything.",
+    "start": "Ah, you're here. Let's get to the bottom of this.",
+    
+    "traits": {
+        "warmth": 8,
+        "energy": 3,
+        "formality": 6,
+        "empathy": 9,
+        "humor": 4,
+        "courage": 7
+    },
+
+    "background":
+"""
+THIS WOULD BE THE 100,000 CHARACTER BACKGROUND.
+Right now it's short, but your real system will store a huge biography,
+hobbies, traumas, life history, family, quirks, habits, secrets,
+whatever the user wants.
+""",
+
+    "speech_style": {
+        "vocab": "medium",
+        "length": "medium",
+        "slang": "limited",
+        "perspective": "first-person"
+    }
+})
+
+
+print(chat("Lyra", "Hey Liora, how are you today?"))
+print(chat("Lyra", "Do you remember what we talked about earlier?"))
